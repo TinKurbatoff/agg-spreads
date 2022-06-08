@@ -7,6 +7,7 @@ import argparse
 import pandas as pd
 import json
 import csv
+import itertools
 # import pandas as pd
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
@@ -249,6 +250,19 @@ class GoogleSheet(object):
         list_of_lists = self.active_sheet.get_all_values()
         # print(dataframe.head(n=10)) # DEBUG * DEBUG * DEBUG
         return list_of_lists
+
+    def read_sheet_to_dict(self, corner=None, width=None, heigh=None, range=None):
+            dictionary = {}
+            list_of_lists = self.active_sheet.get_all_values()
+            # Parse lists to dict
+            try:
+                keys = list_of_lists[0]
+                values = list(map(list, itertools.zip_longest(*list_of_lists[1:], fillvalue=None)))  # Transpose rows to columns
+                for key, column in zip(keys, values):
+                    dictionary[key] = column
+            except Exception as e:
+                logger.error(f"{e}")
+            return dictionary
 
     def update_range_by_corner(self, corner='A1', data=[['OPENED']]):
         """ Updates data by corner A1 notation, list of lists, inner list is a row """
