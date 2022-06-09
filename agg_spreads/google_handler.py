@@ -294,9 +294,9 @@ class GoogleSheet(object):
             self.active_sheet = self.data_source.create_file(title=title, parent_folder_id=folder_id)
             self.sheetID = self.data_source.file_id
             logger.info(f'Open sheet ID: `{self.sheetID}`')
-            result = self.data_source.change_owner(email=email)
-            logger.info(result)
             result = self.data_source.share_file(email=email)
+            logger.info(result)
+            result = self.data_source.change_owner(email=email)
             logger.info(result)
         else:
             logger.info(f'Open sheet ID: `{self.sheetID}`')
