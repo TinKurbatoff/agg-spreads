@@ -1,5 +1,4 @@
 # import libraries
-
 import sys
 import os
 import logging
@@ -10,6 +9,8 @@ import csv
 import itertools
 # import pandas as pd
 import gspread
+from googleapiclient import discovery
+from googleapiclient.errors import HttpError
 from oauth2client.service_account import ServiceAccountCredentials
 
 
@@ -46,7 +47,7 @@ class GoogleSheetsObjects(object):
     opens Google Sheet object and operatest with it
 
     How to call:
-    GS = GoogleSheets('GoogleSheetAPIKey.json')
+    GS = GoogleSheetsObjects('GoogleSheetAPIKey.json')
     GS_file =GS.openWorksheet(file=ID='<a long hex Google Sheets ID>', page = 0) # a tab nposition in the file, 0 - the very first
     GS_tab = GS.workingSheet # a tab in the file (to access) 
     """
@@ -61,12 +62,109 @@ class GoogleSheetsObjects(object):
         self.creds = ServiceAccountCredentials.from_json_keyfile_name(self.keyfile, self.scope)
         # create gspread authorize using that credential
         self.client = gspread.authorize(self.creds)
-        self.wks = None  # Objct with Google sheet file
+        self.file_title = None  # Google sheet filename (title)
+        self.file_id = None  # Google sheet Google file ID
+        self.wks = None  # Object with Google sheet file
         self.workingSheet = None  # a working sheet
         self.column_template = ascii_uppercase
+        self.drive_service = None  # Google Drive object 
+
+    def create_file(self, title: str = "Untitled", parent_folder_id: str = None):
+        """ Creates a new Google spreadsheet """
+        api_response = {}
+        if not self.drive_service:
+            self.drive_service = discovery.build('drive', 'v2', credentials=self.creds)
+        file_metadata = {
+            'title': title,  
+            'mimeType': 'application/vnd.google-apps.spreadsheet',
+            }
+        file_metadata['parents'] = [{'id': parent_folder_id}] if parent_folder_id else []
+        try:
+            api_response = self.drive_service.files().insert(body=file_metadata).execute()  # Creates file in the folder
+            self.file_title = api_response.get('title', None)
+            self.file_id = api_response.get('id', None)
+            self.openWorksheet(fileID=self.file_id)
+            logger.info(f"🔗 CREATED: https://docs.google.com/spreadsheets/d/{self.file_id}/edit?usp=drivesdk")
+        except HttpError as http_e:
+            if http_e.resp.status in [403, 500, 503]:
+                api_response['details'] = 'a rate limit error'    
+            logger.error(f"details: {http_e.error_details[0]}")
+            return None
+        except Exception as e:
+            logger.error(f"{e}")
+            return None
+        self.openWorksheet(fileID=self.file_id, page=0)
+        return self.workingSheet
+
+    def share_file(self, email=None):
+        """ Share file of the file """
+        api_response = {}
+        if not email:
+            api_response['details'] = 'empty email'
+            return api_response
+        new_permissions = {
+            'type': 'group',
+            'role': 'writer',
+            'sendNotificationEmails': 'true',
+            'emailAddress': email,
+            'value': email
+            }
+        try:            
+            # Get permission ID
+            if not self.drive_service:
+                self.drive_service = discovery.build('drive', 'v2', credentials=self.creds)            
+
+            # Changer writer
+            api_response = self.drive_service.permissions().insert(fileId=self.file_id, 
+                                    body=new_permissions, ).execute()
+        except HttpError as http_e:
+            if http_e.resp.status in [403, 500, 503]:
+                api_response['details'] = 'a rate limit error'    
+            return http_e.error_details[0]
+        except Exception as e:
+            logger.error(f"{e}")
+            api_response['error'] = f'{e}'    
+        return api_response
+
+    def change_owner(self, email=None):
+        """ changing owner of the file """
+        api_response = {}
+        if not email:
+            api_response['details'] = 'empty email'
+            return api_response
+
+        # Change ownership
+        change_owner_permissions = {
+            'type': 'group',
+            'transferOwnership': 'true', 
+            'pendingOwner': 'true',  
+            # 'role': 'owner',  # V3 requirement
+            'emailAddress': email,
+            'value': email 
+            }            
+        try:
+            if not self.drive_service:
+                self.drive_service = discovery.build('drive', 'v2', credentials=self.creds)
+            # Get list of permissions
+            permission_list = self.drive_service.permissions().list(fileId=self.file_id).execute() 
+            permission_id = permission_list['items'][0]['id']  
+            # Get update permissions with a new owner
+            api_response = self.drive_service.permissions().update(  
+                                    fileId=self.file_id, 
+                                    body=change_owner_permissions, 
+                                    permissionId=permission_id,
+                                    transferOwnership=True, 
+                                    ).execute()    
+        except HttpError as http_e:
+            if http_e.resp.status in [403, 500, 503]:
+                api_response['details'] = 'a rate limit error'    
+            return http_e.error_details[0]
+        except Exception as e:
+            logger.error(f"{e}")
+            api_response['error'] = f'{e}'    
+        return api_response
 
     def batch_update(self, update):
-        # print('!')
         result = self.workingSheet.batch_update(update)
         return result 
 
@@ -87,6 +185,7 @@ class GoogleSheetsObjects(object):
                 self.workingSheet = self.wks.worksheet(tab_name)
             else:
                 self.workingSheet = self.wks.get_worksheet(page)  # Select a working sheet in the file
+            self.file_id = fileID
         except gspread.exceptions.APIError as e:
             error_message = json.loads(str(e))
             logger.critical("Error {}: {}".format(error_message['error']['code'], error_message['error']['message']))
@@ -174,7 +273,7 @@ class GoogleSheetsObjects(object):
 
 # #############################################################        
 class GoogleSheet(object):
-    """This is a wrapper  for GoogleSheets Class for convenient operations with google sheets
+    """ This is a wrapper  for GoogleSheets Class for convenient operations with google sheets
         Call example:
         GoogleSheetTable = GoogleSheetObject(sheetID='<a long hex Google Sheet ID>', 
                                              keyfile='<API key file.json>'  # for example: `PayhamsterT-8d3756206202.json`
@@ -182,17 +281,29 @@ class GoogleSheet(object):
 
         NOTE! 
         Do not forget to share with google key service account: example: `getgooglesheets@payhamstert.iam.gserviceaccount.com`
- 
     """
-    def __init__(self, sheetID, keyfile, tab_name=None):
+
+    def __init__(self, keyfile, sheetID=None, tab_name=None, title="Untitled", email=None, folder_id=None):
         self.sheetID = sheetID
         # ——— Open Google sheet
         self.data_source = GoogleSheetsObjects(keyfile=keyfile)  # Open Google Sheet with using key file 
-        logger.info(f'Open sheet ID: `{self.sheetID}`')
-        if tab_name:
-            self.active_sheet = self.data_source.openWorksheet(fileID=self.sheetID, tab_name=tab_name)  # open sheet in file
+        if not sheetID:
+            # Please, create file
+            if not email:
+                raise Exception("No user email provided to share with — no access to sheet may be given")
+            self.active_sheet = self.data_source.create_file(title=title, parent_folder_id=folder_id)
+            self.sheetID = self.data_source.file_id
+            logger.info(f'Open sheet ID: `{self.sheetID}`')
+            result = self.data_source.change_owner(email=email)
+            logger.info(result)
+            result = self.data_source.share_file(email=email)
+            logger.info(result)
         else:
-            self.active_sheet = self.data_source.openWorksheet(fileID=self.sheetID, page=0)  # open sheet in file
+            logger.info(f'Open sheet ID: `{self.sheetID}`')
+            if tab_name:
+                self.active_sheet = self.data_source.openWorksheet(fileID=self.sheetID, tab_name=tab_name)  # open sheet in file
+            else:
+                self.active_sheet = self.data_source.openWorksheet(fileID=self.sheetID, page=0)  # open sheet in file
         self.sheetTitle = self.active_sheet.title
         self.file_handler = self.data_source.wks
         self.sheetsList = [x.title for x in self.file_handler.worksheets()]
