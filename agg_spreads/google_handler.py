@@ -176,6 +176,7 @@ class GoogleSheetsObjects(object):
             self.wks = self.client.open_by_key(fileID)  # Open by Sheet ID
             # self.wks = self.client.open(filename) # Open by Sheet filename
         except gspread.exceptions.APIError as e:
+            raise e
             error_message = json.loads(str(e))
             logger.critical("Error {}: {}".format(error_message['error']['code'], error_message['error']['message']))
             return None
@@ -276,11 +277,11 @@ class GoogleSheet(object):
     """ This is a wrapper  for GoogleSheets Class for convenient operations with google sheets
         Call example:
         GoogleSheetTable = GoogleSheetObject(sheetID='<a long hex Google Sheet ID>', 
-                                             keyfile='<API key file.json>'  # for example: `PayhamsterT-8d3756206202.json`
+                                             keyfile='<API key file.json>'  # for example: `<your-app-name>-8d3756206202.json`
         print(GoogleSheetFile.select_tab('MyTab')) # print name of the active tab
 
         NOTE! 
-        Do not forget to share with google key service account: example: `getgooglesheets@payhamstert.iam.gserviceaccount.com`
+        Do not forget to share with google key service account: example: `getgooglesheets@<your-app-name>.iam.gserviceaccount.com`
     """
 
     def __init__(self, keyfile, sheetID=None, tab_name=None, title="Untitled", email=None, folder_id=None):
