@@ -1,5 +1,5 @@
 # import libraries
-import sys
+import time
 import os
 import logging
 import argparse
@@ -189,6 +189,8 @@ class GoogleSheetsObjects(object):
             self.file_id = fileID
         except gspread.exceptions.APIError as e:
             error_message = json.loads(str(e))
+            # error_message = json.loads('{error: str(e)}")
+            error_message = {"error": {"message": f"{e}", "code": "N/A"}}
             logger.critical("Error {}: {}".format(error_message['error']['code'], error_message['error']['message']))
             if error_message['error']['code'] == 403:
                 with open(self.keyfile, 'r') as f:
@@ -352,20 +354,33 @@ class GoogleSheet(object):
             return f'{e}'
         return 'Success'
 
+    def get_all_values(self):
+        """ Read values from sheet, wait if error """
+        all_values = []
+        for x in range(10):
+            try:
+                all_values = self.active_sheet.get_all_values()
+                break
+            except Exception as e:
+                # try to wait for data... 
+                logger.error(f"{e}")
+                time.sleep(x * 2)
+        return all_values
+
     def read_sheet_to_dataframe(self, corner=None, width=None, heigh=None, range=None):
         # list_of_lists = self.active_sheet.get_all_values()
-        dataframe = pd.DataFrame(self.active_sheet.get_all_values())
+        dataframe = pd.DataFrame(self.get_all_values())
         # print(dataframe.head(n=10)) # DEBUG * DEBUG * DEBUG
         return dataframe
 
     def read_sheet_to_list(self, corner=None, width=None, heigh=None, range=None):
-        list_of_lists = self.active_sheet.get_all_values()
+        list_of_lists = self.get_all_values()
         # print(dataframe.head(n=10)) # DEBUG * DEBUG * DEBUG
         return list_of_lists
 
     def read_sheet_to_dict(self, corner=None, width=None, heigh=None, range=None):
             dictionary = {}
-            list_of_lists = self.active_sheet.get_all_values()
+            list_of_lists = self.get_all_values()
             # Parse lists to dict
             try:
                 keys = list_of_lists[0]
