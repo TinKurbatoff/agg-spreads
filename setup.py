@@ -5,4 +5,8 @@ setuptools.setup(
     version="0.1.0",
     author="Constantine K",
     description="One more gspread wraper to work with Google Sheets",
-    packages=["agg_spreads"])
+    packages=["agg_spreads"],
+    install_requires=[
+        'google-api-python-client',
+        'pandas',
+    ])
