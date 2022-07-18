@@ -3,15 +3,20 @@ import time
 import os
 import logging
 import argparse
-import pandas as pd
 import json
 import csv
 import itertools
+import string
+import re
 # import pandas as pd
+
 import gspread
 from googleapiclient import discovery
 from googleapiclient.errors import HttpError
+
 from oauth2client.service_account import ServiceAccountCredentials
+
+import pandas as pd
 
 
 # #############################################
@@ -367,11 +372,40 @@ class GoogleSheet(object):
                 time.sleep(x * 2)
         return all_values
 
-    def read_sheet_to_dataframe(self, corner=None, width=None, heigh=None, range=None):
-        # list_of_lists = self.active_sheet.get_all_values()
-        dataframe = pd.DataFrame(self.get_all_values())
-        # print(dataframe.head(n=10)) # DEBUG * DEBUG * DEBUG
-        return dataframe
+    def read_sheet_to_dataframe(self, corner=None, width=None, heigh=None, range_a1=None):
+        """ Reads datat from current tab to pandas DataFrame object
+            all none — read all
+
+            corner=AA12 — top left corner
+            width=3  — read three colums  
+            heigh=12 — read tvelve rows
+            
+            range='A1:C18' — Just range 'A1:C18' rectangle from A1 to C18 (3x18) 
+        """
+        try:
+            if heigh:
+                # corner + size
+                y, x = re.split(r'(\d+)', corner)
+                x1 = x + heigh
+                y1 = list(string.ascii_uppercase)
+                y1.extend(["A{x} for x in string.ascii_uppercase"])
+                y1_idx = y1.index(y) + width
+                dataframe = pd.DataFrame(self.data_source.readRange(self.active_sheet, line1=x, line2=x1, column1=y, column2=y1[y1_idx]))
+            
+            elif range_a1:
+                # read by range
+                left, right = range_a1.split(':')
+                y, x = re.split(r'(\d+)', left)
+                y1, x1 = re.split(r'(\d+)', right)
+                dataframe = pd.DataFrame(self.data_source.readRange(self.active_sheet, line1=x, line2=x1, column1=y, column2=y1))
+            
+            else:
+                dataframe = pd.DataFrame(self.get_all_values())
+            # print(dataframe.head(n=10)) # DEBUG * DEBUG * DEBUG
+            return dataframe
+        except Exception as e:
+            logger.error(f"{e}")
+            return pd.DataFrame() 
 
     def read_sheet_to_list(self, corner=None, width=None, heigh=None, range=None):
         list_of_lists = self.get_all_values()
