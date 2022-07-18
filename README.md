@@ -9,7 +9,7 @@ This is a wrapper  for GoogleSheets Class for convenient operations with google 
 Call example:
 ```
   GoogleSheetTable = GoogleSheet(sheetID='<a long hex Google Sheet ID>', keyfile='<API key file.json>')  # for example: `<your-app-name>-8d3756206202.json`
-  print(GoogleSheetFile.select_tab('MyTab')) # print name of the active tab
+  print(GoogleSheetTable.select_tab('MyTab')) # print name of the active tab
 ```
 NOTE! 
 Do not forget to share with google key service account: example: `getgooglesheets@<your-app-name>.iam.gserviceaccount.com`
