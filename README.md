@@ -8,8 +8,7 @@ Install with the following command:
 This is a wrapper  for GoogleSheets Class for convenient operations with google sheets
 Call example:
 ```
-  GoogleSheetTable = GoogleSheetObject(sheetID='<a long hex Google Sheet ID>', 
-  keyfile='<API key file.json>'  # for example: `<your-app-name>-8d3756206202.json`
+  GoogleSheetTable = GoogleSheet(sheetID='<a long hex Google Sheet ID>', keyfile='<API key file.json>')  # for example: `<your-app-name>-8d3756206202.json`
   print(GoogleSheetFile.select_tab('MyTab')) # print name of the active tab
 ```
 NOTE! 
@@ -17,7 +16,7 @@ Do not forget to share with google key service account: example: `getgooglesheet
 
 ## Class init parameters
 
-    GoogleSheetObject(keyfile, sheetID=None, tab_name=None, title="Untitled", email=None, folder_id=None)
+    GoogleSheet(keyfile, sheetID=None, tab_name=None, title="Untitled", email=None, folder_id=None)
 
 ## Methods:
     def get_sheet_by_name(name) — 
