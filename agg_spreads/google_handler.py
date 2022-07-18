@@ -292,6 +292,8 @@ class GoogleSheet(object):
     """
 
     def __init__(self, keyfile, sheetID=None, tab_name=None, title="Untitled", email=None, folder_id=None):
+        self.active_sheet = None
+        self.row_count = 0
         self.sheetID = sheetID
         # ——— Open Google sheet
         self.data_source = GoogleSheetsObjects(keyfile=keyfile)  # Open Google Sheet with using key file 
@@ -314,6 +316,7 @@ class GoogleSheet(object):
                 self.active_sheet = self.data_source.openWorksheet(fileID=self.sheetID, page=0)  # open sheet in file
         self.sheetTitle = self.active_sheet.title
         self.file_handler = self.data_source.wks
+        self.row_count = self.active_sheet.row_count if self.active_sheet else 0
         self.sheetsList = [x.title for x in self.file_handler.worksheets()]
         logger.info(f'Open sheet: {self.sheetTitle}')
         # DEBUG ** update_result = self.data_source.update_range_by_corner(self.active_sheet, corner='A1', data=[['-'.join(self.sheetTitle.split(' '))]])
@@ -382,22 +385,35 @@ class GoogleSheet(object):
             
             range='A1:C18' — Just range 'A1:C18' rectangle from A1 to C18 (3x18) 
         """
+        colmns_list = list(string.ascii_uppercase)
+        colmns_list.extend([f"A{x}" for x in string.ascii_uppercase])
         try:
-            if heigh:
+            if corner and heigh:
                 # corner + size
-                y, x = re.split(r'(\d+)', corner)
-                x1 = x + heigh
-                y1 = list(string.ascii_uppercase)
-                y1.extend(["A{x} for x in string.ascii_uppercase"])
-                y1_idx = y1.index(y) + width
-                dataframe = pd.DataFrame(self.data_source.readRange(self.active_sheet, line1=x, line2=x1, column1=y, column2=y1[y1_idx]))
+                # print(re.split(r'(\d+)', corner))   ## ** sanity check **
+                y, x, *_ = re.split(r'(\d+)', corner)
+                x1 = int(x) + heigh - 1
+                y1_idx = colmns_list.index(y) + width - 1
+                # print(f"line1={x}, line2={x1}, column1={y}, column2={colmns_list[y1_idx]}")  # ** sanity check **
+                data_list = [x.value for x in self.data_source.readRange(
+                                self.active_sheet, line1=x, line2=x1, column1=y, column2=colmns_list[y1_idx])]  # get values 
+                dataframe = pd.DataFrame( 
+                    [data_list[i:i + width] for i in range(0, len(data_list), width)]  # split on sublists for DF table
+                    )
             
             elif range_a1:
                 # read by range
                 left, right = range_a1.split(':')
-                y, x = re.split(r'(\d+)', left)
-                y1, x1 = re.split(r'(\d+)', right)
-                dataframe = pd.DataFrame(self.data_source.readRange(self.active_sheet, line1=x, line2=x1, column1=y, column2=y1))
+                y, x, *_ = re.split(r'(\d+)', left)
+                y1, x1, *_ = re.split(r'(\d+)', right)
+                width = colmns_list.index(y1) - colmns_list.index(y) + 1
+                print(colmns_list.index(y1), colmns_list.index(y))
+                print(f"line1={x}, line2={x1}, column1={y}, column2={y1}, width={width}")  # ** sanity check **
+                data_list = [x.value for x in self.data_source.readRange(
+                                self.active_sheet, line1=x, line2=x1, column1=y, column2=y1)]  # get values 
+                dataframe = pd.DataFrame( 
+                    [data_list[i:i + width] for i in range(0, len(data_list), width)]  # split on sublists for DF table
+                    )
             
             else:
                 dataframe = pd.DataFrame(self.get_all_values())
