@@ -8,6 +8,9 @@ Install with the following command:
 This is a wrapper  for GoogleSheets Class for convenient operations with google sheets
 Call example:
 ```
+  #!/usr/bin/python3
+  from agg_spreads import GoogleSheet 
+
   GoogleSheetTable = GoogleSheet(sheetID='<a long hex Google Sheet ID>', keyfile='<API key file.json>')  # for example: `<your-app-name>-8d3756206202.json`
   print(GoogleSheetTable.select_tab('MyTab')) # print name of the active tab
 ```
